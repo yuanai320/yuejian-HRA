@@ -78,7 +78,7 @@
 
 ### v3.5 新增（📷 拍照 OCR 兜底 · 零成本）
 
-35. **📷 拍照/图片识别入口**：新增「📷 拍照/图片识别」标签页，纸质 HRA 报告拍照上传（jpg/png）即可用 **Tesseract 免费 OCR**（中英文 `chi_sim+eng`）识别文字 → 复用现有 `extract_all` 解析 → 解读，**全程无需 API key、零费用**；图片先转灰度 + 自动对比度增强 + 适度放大以提升小字识别率。
+35. **📷 拍照/图片识别入口（支持多张）**：新增「📷 拍照/图片识别」标签页，纸质 HRA 报告可一次多选多张拍照（jpg/png）合并识别，用 **Tesseract 免费 OCR**（中英文 `chi_sim+eng`）识别文字 → 复用现有 `extract_all` 解析 → 解读，**全程无需 API key、零费用**；图片先转灰度 + 自动对比度增强 + 适度放大以提升小字识别率。
 36. **识别率友好兜底**：OCR 不出字 / 匹配不到区域时，给出明确引导（用扫描 App 拍清晰平整报告、或改用带文字层 PDF/Word），避免用户卡死。
 37. **部署依赖**：`requirements.txt` 新增 `pytesseract` / `Pillow`；新增 `packages.txt`（`tesseract-ocr` + `tesseract-ocr-chi-sim`），Streamlit Cloud 免费部署时自动安装系统级 OCR 与中文包，云端拍照识别开箱即用。
 

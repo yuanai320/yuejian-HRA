@@ -558,28 +558,35 @@ else:
                                            f"{len(res['systems'])} 个系统，主要矛盾：**{res['principal']['system']}**")
 
     with tab_photo:
-        uploaded = st.file_uploader("📷 拍照上传 / 图片识别（支持 jpg / png / jpeg）",
-                                    type=["jpg", "jpeg", "png"])
-        if uploaded:
-            st.image(uploaded.getvalue(), caption="已上传图片", width=420)
-            if st.button("✨ 识别并解读", type="primary", use_container_width=True, key="gen_photo"):
-                with st.spinner("正在 OCR 识别图片文字…"):
-                    txt, err = ocr_image_to_text(uploaded.getvalue())
-                if err:
-                    st.error(err)
-                elif not txt or not txt.strip():
-                    st.error("未能从图片中识别出文字。建议：用扫描 App（如手机相机'文档扫描'）拍清晰、"
+        uploaded_list = st.file_uploader(
+            "📷 拍照上传 / 图片识别（支持多张 jpg / png，可一次多选整份报告）",
+            type=["jpg", "jpeg", "png"], accept_multiple_files=True)
+        if uploaded_list:
+            for _u in uploaded_list:
+                st.image(_u.getvalue(), caption=_u.name, width=300)
+            if st.button("✨ 识别并解读（多页合并）", type="primary", use_container_width=True, key="gen_photo"):
+                _texts = []
+                with st.spinner(f"正在 OCR 识别 {len(uploaded_list)} 张图片…"):
+                    for _u in uploaded_list:
+                        _t, _e = ocr_image_to_text(_u.getvalue())
+                        if _e:
+                            st.warning(f"⚠️ {_u.name} 识别失败：{_e}")
+                        elif _t and _t.strip():
+                            _texts.append(_t)
+                _merged = "\n\n".join(_texts)
+                if not _merged.strip():
+                    st.error("所有图片都未能识别出文字。建议：用扫描 App（如手机相机'文档扫描'）拍清晰、"
                              "平整的报告，或改用「📎 上传文件」上传带文字层的 PDF / Word。")
                 else:
-                    profile, regions = extract_all(txt)
+                    profile, regions = extract_all(_merged)
                     if not regions:
                         st.error("已从图片识别出文字，但未能匹配到已知 HRA 区域。可能 OCR 把区域名识别错了。"
                                  "建议：光线均匀、正对拍平；或改用「📎 上传文件」上传带文字层的 PDF / Word。")
                     else:
                         res = analyze(regions, profile, st.session_state.get("q", {}))
                         st.session_state.result = res
-                        st.success(f"✅ 图片识别成功，已识别 {len(regions)} 个区域、{len(res['systems'])} 个系统，"
-                                   f"主要矛盾：**{res['principal']['system']}**")
+                        st.success(f"✅ 共处理 {len(uploaded_list)} 张图，匹配到 {len(regions)} 个区域、"
+                                   f"{len(res['systems'])} 个系统，主要矛盾：**{res['principal']['system']}**")
 
     # 展示结果
     res = st.session_state.result
