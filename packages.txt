@@ -1,1 +1,2 @@
-fonts-wqy-microhei
+tesseract-ocr
+tesseract-ocr-chi-sim

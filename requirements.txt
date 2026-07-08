@@ -7,3 +7,5 @@ pypdf
 python-docx
 reportlab
 fonttools
+pytesseract
+Pillow
