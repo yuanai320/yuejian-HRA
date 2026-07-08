@@ -38,8 +38,31 @@ from engine_v2 import analyze, to_markdown
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 st.set_page_config(page_title="悦检 · HRA 健康解读", page_icon="❤️", layout="wide")
+
+# ---------- 全局样式：响应式 / 留白 / 去 AI 味 ----------
+st.markdown("""
+<style>
+.block-container{max-width:900px;padding-top:1.8rem;padding-bottom:3rem;}
+html,body,[class*="st-"]{font-size:17px;line-height:1.72;}
+h1{font-size:2rem;font-weight:700;letter-spacing:-.02em;}
+h2{font-size:1.45rem;font-weight:700;margin-top:2rem;margin-bottom:.2rem;}
+h3{font-size:1.18rem;font-weight:600;}
+p,li{font-size:1.02rem;}
+[data-testid="stMetric"]{background:#fff;border:1px solid #eef0f3;border-radius:14px;padding:.9rem 1.1rem;box-shadow:0 1px 3px rgba(16,30,54,.05);}
+[data-testid="stMetric"] label{font-size:.9rem;color:#5b6470;font-weight:500;}
+.stAlert{border-radius:12px;border-left:4px solid #2e7d32;background:#f4faf5;}
+hr{border-color:#eceff3;}
+.stButton>button{border-radius:10px;}
+@media (max-width:640px){
+ .block-container{padding-top:1rem;padding-left:.9rem;padding-right:.9rem;}
+ html,body,[class*="st-"]{font-size:16px;line-height:1.66;}
+ h1{font-size:1.55rem;} h2{font-size:1.28rem;}
+ [data-testid="stMetric"]{padding:.7rem .8rem;}
+}
+</style>
+""", unsafe_allow_html=True)
 st.title("❤️ 悦检 · HRA 健康风险评估解读与干预助手")
-st.caption("健康服务与管理专业作品 · v3 · 腾讯混元 Hy3 辅助构建 ｜ 科普参考，不替代医生诊断")
+st.caption("健康服务与管理专业作品 · 科普参考，不替代医生诊断")
 
 # —— 依赖自检：缺包会直接导致上传 PDF / Word / Excel(.xls) 失败 ——
 _missing_deps = []
@@ -215,7 +238,7 @@ def _radar_chart(systems):
 
 
 def _draw_trajectory(traj):
-    """健康轨迹：多次基线叠加成趋势曲线（库兹韦尔：长期监测 / 复利）。"""
+    """健康轨迹：多次基线叠加成趋势曲线（长期监测 / 复利）。"""
     traj = sorted(traj, key=lambda x: x.get("date", ""))
     n = len(traj)
     idx = list(range(n))
@@ -592,7 +615,7 @@ else:
     res = st.session_state.result
     if res:
         st.divider()
-        # ============ 首页概览：一屏看懂（乔布斯极简 + 北极星指标） ============
+        # ============ 首页概览：一屏看懂 ============
         hi = res["health_index"]
         st.markdown("## 🏠 一屏看懂（建议先看这里）")
 
@@ -621,7 +644,7 @@ else:
                 st.markdown(f"🧬 **生理年龄**：约 {ba['bio']} 岁（实际 {ba['age']} 岁，"
                             f"比实际{ba['tag']} {abs(ba['offset'])} 岁）")
 
-        # 综合健康指数分段图例（乔布斯：一眼看懂四档）
+        # 综合健康指数分段图例
         _legend = [
             ("健康", "≥ 85", "#2ecc71", "各系统功能协调"),
             ("良好", "70–84", "#3498db", "少数系统有苗头，早干预收益大"),
@@ -644,13 +667,13 @@ else:
         else:
             st.markdown("- 保持现有良好习惯即可。")
 
-        # 健康 OKR（格鲁夫：量化目标管理）
+        # 健康 OKR
         okr = res["okr"]
-        st.markdown("### 🎯 健康 OKR（格鲁夫·量化目标管理）")
+        st.markdown("### 🎯 健康 OKR")
         st.markdown(f"**O（目标）**：{okr['o']}")
         for k in okr["krs"]:
             st.markdown(f"- **KR**：{k}")
-        # 治未病窗口（格鲁夫战略转折点 + 老子治未病）
+        # 治未病窗口
         tp = res["tipping"]
         if tp:
             st.warning("🌱 **治未病窗口（质变前最后机会）**："
@@ -676,10 +699,10 @@ else:
             else:
                 st.markdown("（当前无异常负债，继续保持）")
 
-        st.markdown("### 🧠 认知提醒 ＆ 🛡️ 反脆弱")
-        st.caption("🧠 卡尼曼：人常因『现在没症状』（现状偏差）和『感觉良好』（过度自信）而低估慢性风险——"
+        st.markdown("### 🧠 认知提醒 ＆ 🛡️ 抗风险提醒")
+        st.caption("人常因『现在没症状』（现状偏差）和『感觉良好』（过度自信）而低估慢性风险——"
                    "报告测的是功能偏差，未必有感觉，请以数据为准。")
-        st.caption("🛡️ 塔勒布：健康要『反脆弱』——适度良性压力（快走、规律作息）让你在波动中变强；"
+        st.caption("健康要『抗风险』——适度良性压力（快走、规律作息）让你在波动中变强；"
                    "要躲开的是脆性行为与『小概率高危害』的冒险（熬夜、猛药、极端节食）。")
 
         st.divider()
@@ -741,9 +764,9 @@ else:
                 st.markdown("🔹 **次要矛盾**：" +
                             "、".join(f"{s['system']}（{s['risk']}）" for s in others))
 
-        # 系统联动提示（芒格：多元思维 / lollapalooza）
+        # 系统联动提示
         if res["links"]:
-            st.markdown("## 🔗 系统联动提示（查理·芒格·多元思维）")
+            st.markdown("## 🔗 系统联动提示")
             st.markdown("> 身体是耦合系统，单点异常常牵动一串。下面是被同时点亮的『连锁链』：")
             for chain, txt in res["links"]:
                 st.markdown(f"- **{chain}**：{txt}")
@@ -770,8 +793,8 @@ else:
             st.checkbox(item, key=f"chk_{i}")
         st.caption("✅ 每完成一项打勾，并写一句『成功日记』：今天我做到了___。坚持 21 天，习惯变资产。")
 
-        # 逆向清单（芒格：避免愚蠢 > 追求聪明）
-        st.markdown("## 🚫 逆向清单：先别做蠢事（查理·芒格）")
+        # 逆向清单
+        st.markdown("## 🚫 逆向清单：先别做蠢事")
         st.markdown("> 进步最快的方式，是先停止做蠢事。把下面这些『别做』刻进习惯：")
         for it in res["invert"]:
             st.markdown(f"- {it}")
@@ -781,7 +804,7 @@ else:
         dim_icon = {"饮食": "🥗", "运动": "🏃", "睡眠": "🌙",
                     "用药": "💊", "情绪管理": "🧘", "生活方式": "💡"}
         for d in ["饮食", "运动", "睡眠", "用药", "情绪管理", "生活方式"]:
-            with st.expander(f"{dim_icon.get(d, '')} {d}", expanded=True):
+            with st.expander(f"{dim_icon.get(d, '')} {d}", expanded=False):
                 for line in res["six"][d]:
                     st.markdown(f"- {line}")
                 # 饮食维度补充明细
@@ -853,8 +876,8 @@ else:
         else:
             st.markdown("保持良好生活方式是最好的预防。")
 
-        # 健康轨迹（库兹韦尔：长期监测 / 多次基线叠加）
-        st.markdown("## 📈 健康轨迹（库兹韦尔·长期监测）")
+        # 健康轨迹
+        st.markdown("## 📈 健康轨迹")
         st.info("上传你之前『保存的基线 JSON』（可多选），与本次叠加看趋势——健康是长期复利，关键看曲线方向。")
         _hist = st.file_uploader("📎 上传历史基线 JSON（可多选）",
                                  type=["json"], accept_multiple_files=True, key="traj_up")
