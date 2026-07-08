@@ -274,6 +274,11 @@ def _register_cjk_font():
             return None
     try:
         pdfmetrics.registerFont(TTFont("CJK", path))
+        # 同时注册粗体别名：避免报告里 **加粗** 在段落/表格中找不到 CJK-Bold 而回退成方块
+        try:
+            pdfmetrics.registerFont(TTFont("CJK-Bold", path))
+        except Exception:
+            pass
         return "CJK"
     except Exception:
         return None
@@ -293,9 +298,11 @@ def _inline_md(t):
 
 
 def _flush_md_table(rows, style):
-    from reportlab.platypus import Table, TableStyle, Spacer
+    from reportlab.platypus import Table, TableStyle, Spacer, Paragraph
     from reportlab.lib import colors
-    data = [[_inline_md(c) for c in r] for r in rows]
+    # 关键修复：单元格必须用 Paragraph 包裹，才能继承中文字体（CJK）；
+    # 直接传字符串会被 reportlab 用默认 Helvetica 渲染，导致整张表中文变方块
+    data = [[Paragraph(_inline_md(c), style) for c in r] for r in rows]
     t = Table(data, hAlign="LEFT")
     t.setStyle(TableStyle([
         ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cccccc")),
