@@ -1,4 +1,4 @@
-# 悦检 · AI 体检报告解读与干预助手（v3.3）
+# 悦检 · AI 体检报告解读与干预助手（v3.4）
 
 > 一份能跑通、能演示、能部署的「健康服务 × AI」作品，用于投递 **AI × 运动健康 / 健康管理** 类实习岗位。
 
@@ -70,6 +70,11 @@
 32. **🔧 依赖自检 + 友好提示**：页面顶部检测 pypdf / python-docx / xlrd / openpyxl 是否安装，缺失即给出**可直接复制的安装命令**，上传失败不再只报一行英文错；
 33. **🚀 免装部署说明**：报告底部新增「免装部署」折叠说明，给出 Streamlit Cloud（免费永久在线）/ ngrok（临时分享）/ pyinstaller 打包 exe（双击用）三种让不懂 Python 的朋友也能打开的方案；附 `requirements.txt`。
 
+### v3.4 新增（最终交付版 · 客户体验闭环）
+> 让不懂技术的用户也能「一键拿走排版好的中文报告」，同时保留在网站反复访问的入口：
+
+34. **📄 下载 PDF 报告**：报告页新增「📄 下载 PDF 报告（排版好，双击即用）」按钮——用 `reportlab` 把报告渲染为带中文的 PDF（自动注册系统中文字体、含雷达图，表格 / 列表 / 引用均排版），双击就是排版好的 PDF，**不用再纠结 .md 怎么看**；`packages.txt` 已配 `fonts-wqy-microhei` 保证云端中文不乱码；依赖新增 `reportlab` / `fonttools`。
+
 ### 本次"查漏补缺"迭代（真实数据驱动）
 用你提供的 `Data.xls`（397 份真实 HRA 电子数据）做端到端校验，修复并增强：
 - **区域名校准**：真实导出有 13 处命名与知识库不同（如 `肝右叶→肝右页`、`冠状动脉→冠状血管`、`Col→Co1`、骨骼/神经/耳鼻喉多处长名差异），并补全 5 个此前缺失的泌尿生殖区域（前列腺/睾丸/卵巢）；现已与真实表头完全对齐；
@@ -93,7 +98,9 @@ health_report_ai/
 ├── sample_real.tsv     # 真实电子数据样本（T6），供「填入真实样本」按钮
 ├── hy3_workflow.md     # 我用 Hy3 做知识库的方法论（=Skill/Agent 设计）
 ├── prompts_for_yuanbao.md  # 在元宝/WorkBuddy 直接跑的 prompt 模板
-├── requirements.txt   # 依赖清单（部署/安装一键用）
+├── requirements.txt   # 依赖清单（部署/安装一键用，含 reportlab/fonttools）
+├── packages.txt       # 部署字体依赖（fonts-wqy-microhei，保证云端中文不乱码）
+├── test_headless.py   # 本地无界面自测脚本（py_compile + 全链路校验）
 └── README.md
 ```
 

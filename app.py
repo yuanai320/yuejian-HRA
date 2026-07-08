@@ -230,6 +230,181 @@ def _draw_trajectory(traj):
     st.image(buf2)
 
 
+# ---------------- PDF 导出：把报告渲染成带中文的 PDF ----------------
+def _register_cjk_font():
+    """为 reportlab 注册一个支持中文的 TTF；返回字体名，失败返回 None（退回 Helvetica）。"""
+    try:
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        import matplotlib.font_manager as fm
+    except Exception:
+        return None
+    cands = ["Microsoft YaHei", "SimHei", "PingFang SC", "Arial Unicode MS",
+             "Noto Sans CJK SC", "WenQuanYi Micro Hei", "Noto Sans CJK JP",
+             "Source Han Sans SC"]
+    path = None
+    for name in cands:
+        try:
+            p = fm.findfont(fm.FontProperties(family=name), fallback_to_default=False)
+            if p and os.path.exists(p):
+                path = p
+                break
+        except Exception:
+            continue
+    if not path:
+        for f in fm.fontManager.ttflist:
+            if any(k in f.name for k in ["CJK", "YaHei", "SimHei", "Hei",
+                                         "PingFang", "WenQuanYi", "Han Sans",
+                                         "Noto Sans CJK"]):
+                if os.path.exists(f.fname):
+                    path = f.fname
+                    break
+    if not path:
+        return None
+    # reportlab 不直接支持 .ttc，用 fontTools 抽出首个字体转存为临时 .ttf
+    if path.lower().endswith(".ttc"):
+        try:
+            from fontTools.ttLib.ttCollection import TTCollection
+            import tempfile as _tempfile
+            coll = TTCollection(path)
+            tmp = _tempfile.NamedTemporaryFile(suffix=".ttf", delete=False, dir=BASE_DIR)
+            coll.fonts[0].save(tmp.name)
+            path = tmp.name
+        except Exception:
+            return None
+    try:
+        pdfmetrics.registerFont(TTFont("CJK", path))
+        return "CJK"
+    except Exception:
+        return None
+
+
+def _inline_md(t):
+    """把 Markdown 行内的 **粗体** 转成 reportlab 的 <b>，并转义 HTML 特殊字符。"""
+    parts = re.split(r"(\*\*.+?\*\*)", t)
+    out = []
+    for p in parts:
+        if len(p) >= 4 and p.startswith("**") and p.endswith("**"):
+            inner = p[2:-2].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            out.append("<b>" + inner + "</b>")
+        else:
+            out.append(p.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+    return "".join(out)
+
+
+def _flush_md_table(rows, style):
+    from reportlab.platypus import Table, TableStyle, Spacer
+    from reportlab.lib import colors
+    data = [[_inline_md(c) for c in r] for r in rows]
+    t = Table(data, hAlign="LEFT")
+    t.setStyle(TableStyle([
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cccccc")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#fdecea")),
+        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+    ]))
+    return [t, Spacer(1, 4)]
+
+
+def _md_to_pdf(md_text, radar_buf=None):
+    """把 to_markdown 生成的报告渲染为带中文的 PDF 字节（含雷达图）。"""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer, Image, HRFlowable)
+    font = _register_cjk_font() or "Helvetica"
+    ss = getSampleStyleSheet()
+
+    def S(name, **kw):
+        kw.setdefault("wordWrap", "CJK")
+        kw.setdefault("fontName", font)
+        return ParagraphStyle(name, parent=ss["Normal"], **kw)
+
+    h2 = S("H2", fontSize=14, spaceBefore=10, spaceAfter=5, textColor=colors.HexColor("#c0392b"), leading=18)
+    h3 = S("H3", fontSize=11.5, spaceBefore=7, spaceAfter=3, textColor=colors.HexColor("#2c3e50"), leading=15)
+    h4 = S("H4", fontSize=10.5, spaceBefore=5, spaceAfter=2, leading=14)
+    body = S("Body", fontSize=9.5, leading=15, spaceAfter=4)
+    quote = S("Quote", fontSize=9, leading=14, leftIndent=10, textColor=colors.HexColor("#555"),
+              backColor=colors.HexColor("#f5f5f5"), borderPadding=5, spaceAfter=5)
+    liststyle = S("List", fontSize=9.5, leading=14, leftIndent=14, spaceAfter=2)
+
+    out = io.BytesIO()
+    doc = SimpleDocTemplate(out, pagesize=A4, topMargin=16 * mm, bottomMargin=15 * mm,
+                            leftMargin=16 * mm, rightMargin=16 * mm, title="HRA综合解读报告")
+    flow = [Paragraph("HRA 健康风险评估解读报告", h2),
+            HRFlowable(width="100%", thickness=1, color=colors.HexColor("#c0392b")),
+            Spacer(1, 6)]
+    if radar_buf is not None:
+        try:
+            radar_buf.seek(0)
+            img = Image(radar_buf, width=108 * mm, height=108 * mm)
+            img.hAlign = "CENTER"
+            flow.append(img)
+            flow.append(Spacer(1, 6))
+        except Exception:
+            pass
+    table_buf = []
+    for line in md_text.splitlines():
+        s = line.rstrip()
+        if not s.strip():
+            if table_buf:
+                flow += _flush_md_table(table_buf, body)
+                table_buf = []
+            flow.append(Spacer(1, 3))
+            continue
+        if s.startswith("### "):
+            if table_buf:
+                flow += _flush_md_table(table_buf, body)
+                table_buf = []
+            flow.append(Paragraph(_inline_md(s[4:]), h4))
+            continue
+        if s.startswith("## "):
+            if table_buf:
+                flow += _flush_md_table(table_buf, body)
+                table_buf = []
+            flow.append(Paragraph(_inline_md(s[3:]), h3))
+            continue
+        if s.startswith("# "):
+            if table_buf:
+                flow += _flush_md_table(table_buf, body)
+                table_buf = []
+            flow.append(Paragraph(_inline_md(s[2:]), h2))
+            continue
+        if s.startswith("> "):
+            if table_buf:
+                flow += _flush_md_table(table_buf, body)
+                table_buf = []
+            flow.append(Paragraph(_inline_md(s[2:]), quote))
+            continue
+        if re.match(r"^\s*[-*]\s+", s):
+            if table_buf:
+                flow += _flush_md_table(table_buf, body)
+                table_buf = []
+            item = re.sub(r"^\s*[-*]\s+", "", s)
+            flow.append(Paragraph("• " + _inline_md(item), liststyle))
+            continue
+        if s.strip().startswith("|") and s.strip().endswith("|"):
+            cells = [c.strip() for c in s.strip().strip("|").split("|")]
+            if cells and all(re.fullmatch(r":?-+:?", c) for c in cells):
+                continue
+            table_buf.append(cells)
+            continue
+        if table_buf:
+            flow += _flush_md_table(table_buf, body)
+            table_buf = []
+        flow.append(Paragraph(_inline_md(s), body))
+    if table_buf:
+        flow += _flush_md_table(table_buf, body)
+    doc.build(flow)
+    out.seek(0)
+    return out.getvalue()
+
+
 # ---------------- 步骤一：生活方式问卷 ----------------
 if st.session_state.step == "问卷":
     st.header("📝 第一步：生活方式问卷")
@@ -639,6 +814,14 @@ else:
 
         md = to_markdown(res)
         st.download_button("📥 下载完整报告 (.md)", md, "HRA综合解读报告.md", "text/markdown")
+        # —— 下载 PDF 版报告：双击即排版好的中文 PDF，无需纠结 .md 怎么看 ——
+        try:
+            _radar_pdf = _radar_chart(res["systems"])
+            _pdf_bytes = _md_to_pdf(md, _radar_pdf)
+            st.download_button("📄 下载 PDF 报告（排版好，双击即用）", _pdf_bytes,
+                               "HRA综合解读报告.pdf", "application/pdf")
+        except Exception as _e:
+            st.caption(f"⚠️ PDF 生成暂不可用：{_e}")
         st.caption("⚠️ 本报告由 AI 辅助生成，仅作健康科普与自我管理参考，不构成诊断或治疗建议。"
                    "异常指标请务必咨询执业医师。")
 

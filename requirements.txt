@@ -5,3 +5,5 @@ xlrd
 openpyxl
 pypdf
 python-docx
+reportlab
+fonttools
