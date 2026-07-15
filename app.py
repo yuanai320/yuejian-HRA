@@ -37,6 +37,22 @@ from engine_v2 import analyze, to_markdown
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# ── 捆绑中文字体（修复 PDF 导出中文变方块）──
+# 把 NotoSansSC 随仓库分发，matplotlib 与 reportlab 都优先用它，
+# 不再依赖系统是否装了中文字体（Windows / Mac / Linux / Streamlit Cloud 一致）。
+import matplotlib.font_manager as _fm
+_BUNDLED_CJK = []
+for _fp in [os.path.join(BASE_DIR, "fonts", "NotoSansSC-Regular.ttf"),
+            os.path.join(BASE_DIR, "fonts", "NotoSansSC-Bold.ttf")]:
+    if os.path.exists(_fp):
+        try:
+            _fm.fontManager.addfont(_fp)
+            _BUNDLED_CJK.append(_fm.FontProperties(fname=_fp).get_name())
+        except Exception:
+            pass
+if _BUNDLED_CJK:
+    plt.rcParams["font.sans-serif"] = _BUNDLED_CJK + list(plt.rcParams["font.sans-serif"])
+
 st.set_page_config(page_title="悦检 · HRA 健康解读", page_icon="❤️", layout="wide")
 
 # ---------- 全局样式：响应式 / 留白 / 去 AI 味 ----------
@@ -282,13 +298,32 @@ def _draw_trajectory(traj):
 
 # ---------------- PDF 导出：把报告渲染成带中文的 PDF ----------------
 def _register_cjk_font():
-    """为 reportlab 注册一个支持中文的 TTF；返回字体名，失败返回 None（退回 Helvetica）。"""
+    """为 reportlab 注册一个支持中文的 TTF；返回字体名，失败返回 None（退回 Helvetica）。
+    优先使用随仓库捆绑的 NotoSansSC（跨平台稳定），再回退系统字体。"""
     try:
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
         import matplotlib.font_manager as fm
     except Exception:
         return None
+    # 1) 优先：随包捆绑的中文字体（不依赖系统 / Streamlit Cloud 是否装了中文字体）
+    _reg = {
+        "CJK": os.path.join(BASE_DIR, "fonts", "NotoSansSC-Regular.ttf"),
+        "CJK-Bold": os.path.join(BASE_DIR, "fonts", "NotoSansSC-Bold.ttf"),
+    }
+    _ok = True
+    for _name, _fp in _reg.items():
+        if not (os.path.exists(_fp) and _fp.lower().endswith(".ttf")):
+            _ok = False
+            break
+        try:
+            pdfmetrics.registerFont(TTFont(_name, _fp))
+        except Exception:
+            _ok = False
+            break
+    if _ok:
+        return "CJK"
+    # 2) 回退：系统已安装的中文字体
     cands = ["Microsoft YaHei", "SimHei", "PingFang SC", "Arial Unicode MS",
              "Noto Sans CJK SC", "WenQuanYi Micro Hei", "Noto Sans CJK JP",
              "Source Han Sans SC"]
