@@ -55,6 +55,38 @@ if _BUNDLED_CJK:
 
 st.set_page_config(page_title="悦检 · HRA 健康解读", page_icon="❤️", layout="wide")
 
+# ─────────────────────────────────────────────
+# 访问统计（匿名：只记数字，不收集任何健康信息 / 不记录个人身份）
+# 计数器托管在 abacus.jasoncameron.dev，仅存一个累加值
+# ─────────────────────────────────────────────
+def _counter(key, hit=False):
+    """读写公共计数器；失败时静默返回 None，不影响页面。"""
+    import urllib.request
+    op = "hit" if hit else "get"
+    try:
+        with urllib.request.urlopen(
+            "https://abacus.jasoncameron.dev/%s/yuanai-yuejian/%s" % (op, key),
+            timeout=3) as _r:
+            return json.loads(_r.read().decode("utf-8")).get("value")
+    except Exception:
+        return None
+
+if "_seen_once" not in st.session_state:
+    # 每个会话只记一次：新增 1 位使用者、1 次访问
+    st.session_state["_seen_once"] = True
+    st.session_state["_users"] = _counter("users", hit=True)
+    st.session_state["_visits"] = _counter("visits", hit=True)
+    st.session_state["_reports"] = _counter("reports", hit=False)
+USERS = st.session_state.get("_users")
+VISITS = st.session_state.get("_visits")
+
+def _count_use():
+    """完成一次解读时调用（同一会话只记一次）。"""
+    if st.session_state.get("_used_once"):
+        return
+    st.session_state["_used_once"] = True
+    st.session_state["_reports"] = _counter("reports", hit=True)
+
 # ---------- 全局样式：响应式 / 留白 / 去 AI 味 ----------
 st.markdown("""
 <style>
@@ -78,7 +110,19 @@ hr{border-color:#eceff3;}
 </style>
 """, unsafe_allow_html=True)
 st.title("❤️ 悦检 · HRA 健康风险评估解读与干预助手")
-st.caption("健康服务与管理专业作品 · 科普参考，不替代医生诊断")
+st.caption("健康服务与管理专业作品 · **健康风险评估工具，非医学诊断**")
+st.info(
+    "**关于本系统的定位**：悦检是**健康风险评估**工具，不是诊断工具。"
+    "页面上的数值与结论，反映的是身体状态相对参考范围的**偏离程度与变化趋势**，"
+    "用来提示你「哪些方面值得留意」。它**不表示已患某种疾病**，也不能替代医生的检查、检验与判断。"
+)
+if USERS:
+    _rep = st.session_state.get("_reports")
+    _tail = f" · 已完成 <b>{_rep}</b> 次报告解读" if _rep else ""
+    st.markdown(
+        f"<div style='text-align:right;color:#8a8a8a;font-size:0.86rem;margin:-0.5rem 0 0.6rem;'>"
+        f"👥 已有 <b>{USERS}</b> 位使用者来过{_tail}</div>",
+        unsafe_allow_html=True)
 
 # —— 依赖自检：缺包会直接导致上传 PDF / Word / Excel(.xls) 失败 ——
 _missing_deps = []
@@ -649,6 +693,7 @@ else:
     # 展示结果
     res = st.session_state.result
     if res:
+        _count_use()
         st.divider()
         # ============ 首页概览：一屏看懂 ============
         hi = res["health_index"]
@@ -713,7 +758,7 @@ else:
         if tp:
             st.warning("🌱 **治未病窗口（质变前最后机会）**："
                        + "、".join(f"{s}（{r}，最大偏离 {m}）" for s, m, r in tp)
-                       + " 已接近高风险阈值——此刻干预成本最低，拖下去将进入『质变』。")
+                       + " 呈持续偏离倾向、已接近需重点关注的区间——此刻干预成本最低，拖下去偏离会进一步累积。")
 
         rc = _radar_chart(res["systems"])
         a1, a2 = st.columns([1, 1])
@@ -732,7 +777,7 @@ else:
             if res["assets"]["liabilities"]:
                 st.markdown("、".join(f"`{x}`（{r}）" for x, r in res["assets"]["liabilities"]))
             else:
-                st.markdown("（当前无异常负债，继续保持）")
+                st.markdown("（当前无偏离项，继续保持）")
 
         st.markdown("### 🧠 认知提醒 ＆ 🛡️ 抗风险提醒")
         st.caption("人常因『现在没症状』（现状偏差）和『感觉良好』（过度自信）而低估慢性风险——"
@@ -774,7 +819,7 @@ else:
         for s in res["systems"]:
             icon = s["meta"].get("icon", "")
             with st.expander(f"{icon} {s['system']} —— 风险：**{s['risk']}**"
-                             f"（异常 {s['n_abn']}/{s['n_total']}，最大偏离 {s['maxabs']}）",
+                             f"（偏离 {s['n_abn']}/{s['n_total']}，最大偏离 {s['maxabs']}）",
                              expanded=(s["risk"] in ("高风险", "中风险"))):
                 st.markdown(f"**当前状态**：{s['findings']}")
                 if s["abn"]:
@@ -802,7 +847,7 @@ else:
         # 系统联动提示
         if res["links"]:
             st.markdown("## 🔗 系统联动提示")
-            st.markdown("> 身体是耦合系统，单点异常常牵动一串。下面是被同时点亮的『连锁链』：")
+            st.markdown("> 身体是耦合系统，单点偏离常牵动一串。下面是被同时点亮的『连锁链』：")
             for chain, txt in res["links"]:
                 st.markdown(f"- **{chain}**：{txt}")
 
@@ -872,7 +917,7 @@ else:
                       "推荐检查项目": [m[2] for m in res["medical"]]}
             st.table(med_df)
         else:
-            st.markdown("当前无系统显著异常，常规年度体检即可。")
+            st.markdown("当前各系统未见显著偏离趋势，保持常规年度体检即可。")
 
         # 用药建议
         st.markdown("## 七、💊 用药建议（务必遵医嘱）")
@@ -946,7 +991,7 @@ else:
         except Exception as _e:
             st.caption(f"⚠️ PDF 生成暂不可用：{_e}")
         st.caption("⚠️ 本报告由 AI 辅助生成，仅作健康科普与自我管理参考，不构成诊断或治疗建议。"
-                   "异常指标请务必咨询执业医师。")
+                   "若某项指标呈持续偏离趋势，请务必咨询执业医师。")
 
 # —— 免装部署：让不懂 Python 的朋友也能直接打开网页 ——
 with st.expander("🚀 免装部署：如何发给不懂 Python 的朋友直接用？"):

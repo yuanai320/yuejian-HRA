@@ -435,7 +435,7 @@ def to_markdown(res):
     for s in res["systems"]:
         icon = s["meta"].get("icon", "")
         L.append(f"### {icon} {s['system']} —— 风险等级：**{s['risk']}**"
-                 f"（异常区域 {s['n_abn']}/{s['n_total']}，最大偏离 {s['maxabs']}）\n")
+                 f"（偏离区域 {s['n_abn']}/{s['n_total']}，最大偏离 {s['maxabs']}）\n")
         L.append(f"- 当前状态：{s['findings']}\n")
         if s["abn"]:
             top = "、".join(f"{r}（{v}）" for r, v in s["items"][:3])
@@ -508,7 +508,7 @@ def to_markdown(res):
             L.append(f"| {sysname} | {dept} | {exam} |")
         L.append("")
     else:
-        L.append("- 当前无系统显著异常，常规年度体检即可。\n")
+        L.append("- 当前各系统未见显著偏离趋势，保持常规年度体检即可。\n")
 
     # 用药建议
     L.append("## 七、💊 用药建议（务必遵医嘱）\n")
@@ -538,7 +538,7 @@ def to_markdown(res):
 
     L.append("\n## 十、免责声明\n"
              "⚠️ 本报告由 AI 辅助生成，仅作健康科普与自我管理参考，不构成诊断或治疗建议。"
-             "异常指标、用药与就医决策请务必咨询执业医师。\n")
+             "若某项指标呈持续偏离趋势，用药与就医决策请务必咨询执业医师。\n")
     return "\n".join(L)
 
 
