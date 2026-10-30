@@ -33,7 +33,8 @@ SYSTEM_LINKS = [
 
 from hra_knowledge import (SYSTEM_OF, SYSTEM_ORDER, SYSTEM_META, SYSTEM_FINDINGS,
                            DIM_ADVICE, GENERAL, SYSTEM_DIET, SYSTEM_MEDICAL,
-                           SYSTEM_MEDICATION, SYSTEM_TREND, SYSTEM_EDU, NORMAL_RANGE)
+                           SYSTEM_MEDICATION, SYSTEM_TREND, SYSTEM_EDU, NORMAL_RANGE,
+                           DS14_ITEMS, DS14_SCALE, DS14_CUTOFF, DS14_TYPES)
 
 
 def _status(v):
@@ -118,6 +119,9 @@ def analyze(regions, profile=None, q=None):
     medication = _build_medication(systems)
     trend = _build_trend(systems)
     edu = _build_edu(systems)
+    personality = _personality(q)
+    if personality:
+        edu.append(("性格适配", personality["edu"]))
     top3 = _build_top3(principal)
     health_index = _health_index(systems, profile)
     retest = _retest_cycle(principal)
@@ -160,6 +164,60 @@ def analyze(regions, profile=None, q=None):
         "overview": overview,
         "profile": profile,
         "q": q,
+        "personality": personality,
+    }
+
+
+def _personality(q):
+    """DS14（D 型人格量表）计分 → NA / SI → 四型映射。
+
+    量表：Denollet J. Psychother Psychosom, 2005, 74(2): 89-97.
+    中文版：于肖楠, 张建新. 中国心理卫生杂志, 2006, 20(5): 313-316.
+           瞿云中, 黄彦科, 姚树桥. 中国临床心理学杂志, 2009, 17(4): 452-456.
+
+    计分：0-4 五点。NA 7 题直接相加；SI 7 题中第 1、3 题反向计分（4-原始分）。
+    D 型判定沿用原量表标准：NA >= 10 且 SI >= 10。
+    14 题须全部作答，缺答则不出结果（避免以部分数据推断类型）。
+    本结果仅用于建议适配，不构成任何心理诊断。
+    """
+    if not q:
+        return None
+    smap = {k: i for i, k in enumerate(DS14_SCALE)}
+    na_vals, si_vals, missing = [], [], 0
+    for it in DS14_ITEMS:
+        v = q.get(it["key"])
+        if v not in smap:
+            missing += 1
+            continue
+        n = smap[v]
+        if it["sub"] == "NA":
+            na_vals.append(n)
+        else:
+            si_vals.append(4 - n if it["rev"] else n)
+    if missing:
+        return None                      # 有题未答，不出类型
+
+    na, si = sum(na_vals), sum(si_vals)
+    if na >= DS14_CUTOFF and si >= DS14_CUTOFF:
+        t = "D"
+    elif na >= DS14_CUTOFF:
+        t = "A"
+    elif si >= DS14_CUTOFF:
+        t = "C"
+    else:
+        t = "B"
+
+    prof = DS14_TYPES[t]
+    return {
+        "type": t,
+        "name": prof["name"],
+        "tag": prof["tag"],
+        "na": na,
+        "si": si,
+        "portrait": prof["portrait"],
+        "emotion": prof["emotion"],
+        "edu": prof["edu"],
+        "adherence": prof["adherence"],
     }
 
 
@@ -201,6 +259,10 @@ def _build_six_dim(systems, q, principal):
         out["睡眠"].append("⚠️ 你的睡眠时长/质量不足，先固定作息，比补运动更急迫。")
     if q.get("stress") == "高":
         out["情绪管理"].append("⚠️ 高压力会放大神经/内分泌偏差，每日 10 分钟正念或散步减压。")
+    _pt = _personality(q)
+    if _pt:
+        out["情绪管理"].append(f"🧩 **适合你的减压方式 · {_pt['name']}**：{_pt['emotion']}")
+        out["生活方式"].append(f"🧩 **怎么让你坚持下去 · {_pt['name']}**：{_pt['adherence']}")
     if q.get("smoke") in ("偶尔", "经常"):
         out["生活方式"].append("⚠️ 吸烟显著加重心血管与呼吸系统风险，建议尽快戒烟。")
     if q.get("sit") == ">8h":
@@ -472,6 +534,19 @@ def to_markdown(res):
 
     # 六维综合干预建议（统一）
     L.append("## 五、六维综合干预建议（统一方案）\n")
+    _pt = res.get("personality")
+    if _pt:
+        L.append("### 🧩 先看这里：你的人格类型（DS14）\n")
+        L.append(f"- **类型**：{_pt['name']}")
+        L.append(f"- **判定方式**：{_pt['tag']}")
+        L.append(f"- **两个维度得分**：消极情感 NA = {_pt['na']}/28，社交抑制 SI = {_pt['si']}/28"
+                 f"（DS14 分界值：两项均 ≥10 判为 D 型）")
+        L.append(f"- **画像**：{_pt['portrait']}")
+        L.append(f"- **适配策略**：{_pt['adherence']}")
+        L.append("\n> 说明：本测评使用 **D 型人格量表 DS14**（Denollet, 2005；中文版 于肖楠、张建新, 2006）"
+                 "的原题与计分规则，D 型判定按原量表的 NA≥10 且 SI≥10。"
+                 "A/B/C 三型为同一两维度上的象限描述，与其原始理论定义一致，但未经 DS14 效度验证。"
+                 "本结果**仅用于把建议调成你用得下去的样子，不构成任何心理诊断**。\n")
     dim_icon = {"饮食": "🥗", "运动": "🏃", "睡眠": "🌙", "用药": "💊",
                 "情绪管理": "🧘", "生活方式": "💡"}
     for d in ["饮食", "运动", "睡眠", "用药", "情绪管理", "生活方式"]:

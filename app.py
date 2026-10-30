@@ -31,7 +31,8 @@ plt.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei", "PingFang SC",
                                    "WenQuanYi Micro Hei", "sans-serif"]
 plt.rcParams["axes.unicode_minus"] = False  # 正常显示负号
 
-from hra_knowledge import QUESTIONNAIRE, REGIONS, NORMAL_RANGE
+from hra_knowledge import (QUESTIONNAIRE, REGIONS, NORMAL_RANGE,
+                           DS14_ITEMS, DS14_SCALE)
 from extract import extract_all
 from engine_v2 import analyze, to_markdown
 
@@ -550,6 +551,20 @@ if st.session_state.step == "问卷":
     for i, item in enumerate(QUESTIONNAIRE):
         with cols[i % 2]:
             answers[item["key"]] = st.radio(item["q"], item["options"], key="q_" + item["key"])
+
+    st.markdown("---")
+    st.markdown("#### 🧩 人格测评：D 型人格量表 DS14（14 题，约 2 分钟）")
+    st.caption(
+        "采用 **DS14（Type D Scale-14）** 原量表条目，中文版信效度见：于肖楠、张建新《中国心理卫生杂志》2006；"
+        "瞿云中等《中国临床心理学杂志》2009。测的是**消极情感（NA）** 与 **社交抑制（SI）** 两个维度，"
+        "并按原量表标准（NA≥10 且 SI≥10）判定 D 型。结果只用于调整建议的措辞与力度，**不构成心理诊断**。"
+    )
+    st.caption("0 = 完全不符合 · 1 = 基本不符合 · 2 = 中立 · 3 = 基本符合 · 4 = 完全符合")
+    pcols = st.columns(2)
+    for i, item in enumerate(DS14_ITEMS):
+        with pcols[i % 2]:
+            answers[item["key"]] = st.radio(item["q"], DS14_SCALE, index=None,
+                                            key="pd_" + item["key"], horizontal=True)
     if st.button("✅ 开始解读 →", type="primary", use_container_width=True):
         st.session_state.q = answers
         st.session_state.step = "报告"
@@ -880,6 +895,24 @@ else:
             st.markdown(f"- {it}")
 
         # 六维综合干预建议（统一，不逐系统罗列）
+        _pt = res.get("personality")
+        if _pt:
+            _sc = "消极情感 NA <b>%d</b>/28　社交抑制 SI <b>%d</b>/28" % (_pt["na"], _pt["si"])
+            _html = (
+                "<div style='background:#f7f9fc;border-left:4px solid #4a90d9;"
+                "border-radius:10px;padding:14px 16px;margin:10px 0;'>"
+                "<div style='font-size:1.05rem;font-weight:700;margin-bottom:6px;'>"
+                "🧩 你的健康性格画像：" + _pt["name"] + "</div>"
+                "<div style='line-height:1.75;'>" + _pt["portrait"] + "</div>"
+                "<div style='margin-top:8px;color:#555;font-size:0.92rem;'>" + _sc + "</div>"
+                "<div style='margin-top:8px;font-size:0.92rem;'><b>怎么让你坚持下去</b>："
+                + _pt["adherence"] + "</div>"
+                "<div style='margin-top:6px;color:#999;font-size:0.82rem;'>"
+                "DS14 量表条目（Denollet 2005；中文版 于肖楠、张建新 2006），D 型判定按原标准 NA≥10 且 SI≥10。"
+                "A/B/C 三型为同一两维度上的象限描述。结果仅用于调整建议措辞，不构成心理诊断。</div></div>"
+            )
+            st.markdown(_html, unsafe_allow_html=True)
+
         st.markdown("## 五、六维综合干预建议（统一方案）")
         dim_icon = {"饮食": "🥗", "运动": "🏃", "睡眠": "🌙",
                     "用药": "💊", "情绪管理": "🧘", "生活方式": "💡"}
